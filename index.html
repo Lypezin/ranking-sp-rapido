@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ranking de Entregadores</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,13 +17,6 @@
         <header>
             <h1>Ranking de Performance</h1>
         </header>
-
-        <!-- Drop Zone: hidden by default, shown with ?admin=true -->
-        <div id="dropZone" class="drop-zone" style="display: none;">
-            <p>Admin: Arraste <strong>ranking.xlsx</strong></p>
-            <input type="file" id="fileInput" accept=".xlsx, .xls" hidden>
-            <button id="btnSync" class="btn-sync" style="display: none;">Enviar para o Banco ☁️</button>
-        </div>
 
         <div class="search-container">
             <input type="text" id="searchInput" placeholder="Buscar por nome..." oninput="filterRanking()">
@@ -41,7 +33,6 @@
         </div>
     </div>
 
-    <script src="data.js"></script>
     <script src="script.js"></script>
 </body>
 

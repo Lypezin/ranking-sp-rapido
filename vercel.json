@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/upload", "destination": "/upload.html" }
+  ],
+  "cleanUrls": true
+}

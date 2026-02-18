@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload - Ranking</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Upload de Dados</h1>
+            <p style="color: #94a3b8; margin-top: 0.5rem;">
+                <a href="/" style="color: #818cf8; text-decoration: none;">← Voltar ao Ranking</a>
+            </p>
+        </header>
+
+        <div id="dropZone" class="drop-zone"
+            style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+            <p>Arraste sua planilha <strong>.xlsx</strong> aqui ou clique para selecionar</p>
+            <input type="file" id="fileInput" accept=".xlsx, .xls" hidden>
+            <button id="btnSync" class="btn-sync" style="display: none;">Enviar para o Banco de Dados ☁️</button>
+        </div>
+
+        <div id="statusArea" style="margin-top: 1.5rem; text-align: center; color: #94a3b8;"></div>
+
+        <div style="margin-top: 2rem;">
+            <button id="btnClear" class="btn-sync"
+                style="background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);">
+                🗑️ Limpar Banco de Dados (antes de reenviar)
+            </button>
+        </div>
+
+        <div id="previewList" class="ranking-list" style="margin-top: 2rem;">
+            <!-- Preview will be injected here -->
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://dcwwyzvlqwrpwpeyfzhv.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjd3d5enZscXdycHdwZXlmemh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MzE1NTYsImV4cCI6MjA4NzAwNzU1Nn0.HLC46MtdgUM21yOzGXfkZzuuzyR3BqOKZ-GrzrxA88k';
+
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: { persistSession: false }
+        });
+
+        let pendingSyncData = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const btnSync = document.getElementById('btnSync');
+            const btnClear = document.getElementById('btnClear');
+            const statusArea = document.getElementById('statusArea');
+
+            // Click to select file
+            dropZone.addEventListener('click', (e) => {
+                if (e.target !== btnSync) fileInput.click();
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) handleFile(e.target.files[0]);
+            });
+
+            // Drag & Drop
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+            });
+
+            // Send to Supabase
+            btnSync.addEventListener('click', () => {
+                if (pendingSyncData.length > 0) uploadToSupabase(pendingSyncData);
+            });
+
+            // Clear database
+            btnClear.addEventListener('click', async () => {
+                if (!confirm('Tem certeza que quer apagar TODOS os dados do banco?')) return;
+                btnClear.textContent = 'Apagando...';
+                btnClear.disabled = true;
+                try {
+                    const { error } = await supabaseClient
+                        .from('delivery_rankings')
+                        .delete()
+                        .neq('id', '00000000-0000-0000-0000-000000000000');
+                    if (error) throw error;
+                    statusArea.innerHTML = '<span style="color: #10b981;">✅ Banco de dados limpo! Agora envie a planilha nova.</span>';
+                } catch (err) {
+                    console.error(err);
+                    statusArea.innerHTML = '<span style="color: #ef4444;">❌ Erro ao limpar: ' + err.message + '</span>';
+                }
+                btnClear.textContent = '🗑️ Limpar Banco de Dados';
+                btnClear.disabled = false;
+            });
+        });
+
+        function parseValue(rawVal) {
+            if (typeof rawVal === 'number') return rawVal;
+            if (typeof rawVal === 'string') {
+                rawVal = rawVal.replace(/[R$\s]/g, '');
+                if (rawVal.includes(',') && !rawVal.includes('.')) return parseFloat(rawVal.replace(',', '.'));
+                if (rawVal.includes(',') && rawVal.includes('.')) return parseFloat(rawVal.replace(/\./g, '').replace(',', '.'));
+                return parseFloat(rawVal);
+            }
+            return 0;
+        }
+
+        function handleFile(file) {
+            const statusArea = document.getElementById('statusArea');
+            statusArea.textContent = 'Lendo planilha...';
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const workbook = XLSX.read(e.target.result, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+                const normalizedData = jsonData.map(row => {
+                    const keys = Object.keys(row);
+
+                    // Find columns
+                    const idKey = keys.find(k => k.toLowerCase().includes('id'));
+                    const nameKey = keys.find(k =>
+                        k.toLowerCase().includes('recebedor') ||
+                        k.toLowerCase().includes('nome') ||
+                        k.toLowerCase().includes('cliente') ||
+                        k.toLowerCase().includes('entregador')
+                    );
+                    const valKey = keys.find(k => k.toLowerCase().includes('valor'));
+
+                    if ((idKey || nameKey) && valKey) {
+                        return {
+                            courier_id: idKey ? String(row[idKey]) : String(row[nameKey]),
+                            receiver: nameKey ? String(row[nameKey]) : (idKey ? String(row[idKey]) : ''),
+                            value: parseValue(row[valKey])
+                        };
+                    }
+                    return null;
+                }).filter(Boolean);
+
+                if (normalizedData.length > 0) {
+                    pendingSyncData = normalizedData;
+                    statusArea.innerHTML = `<span style="color: #10b981;">✅ ${normalizedData.length} registros encontrados. Clique em "Enviar" para salvar.</span>`;
+                    document.getElementById('btnSync').style.display = 'block';
+
+                    // Preview: group by courier_id, show receiver name
+                    const totals = {};
+                    const names = {};
+                    normalizedData.forEach(item => {
+                        const id = item.courier_id;
+                        totals[id] = (totals[id] || 0) + item.value;
+                        if (!names[id]) names[id] = item.receiver || id;
+                    });
+
+                    const preview = Object.keys(totals)
+                        .map(id => ({ name: names[id], total: totals[id] }))
+                        .sort((a, b) => b.total - a.total)
+                        .slice(0, 20); // Show top 20 preview
+
+                    const previewList = document.getElementById('previewList');
+                    previewList.innerHTML = '<h3 style="color: #cbd5e1; margin-bottom: 1rem;">Pré-visualização (Top 20):</h3>';
+                    preview.forEach((item, i) => {
+                        const val = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total);
+                        previewList.innerHTML += `
+                            <div class="rank-card ${i < 3 ? 'top-' + (i + 1) : ''}">
+                                <div class="rank-info">
+                                    <div class="rank-position">${i + 1}º</div>
+                                    <div class="rank-details"><h3>${item.name}</h3></div>
+                                </div>
+                                <div class="rank-value">${val}</div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    statusArea.innerHTML = '<span style="color: #ef4444;">❌ Não encontrei colunas esperadas (ID/Nome, Valor).</span>';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function uploadToSupabase(data) {
+            const btn = document.getElementById('btnSync');
+            const statusArea = document.getElementById('statusArea');
+            btn.textContent = 'Enviando... ⏳';
+            btn.disabled = true;
+
+            try {
+                const CHUNK_SIZE = 500;
+                for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+                    const chunk = data.slice(i, i + CHUNK_SIZE);
+                    const { error } = await supabaseClient
+                        .from('delivery_rankings')
+                        .insert(chunk);
+                    if (error) throw error;
+
+                    const pct = Math.min(100, Math.round(((i + chunk.length) / data.length) * 100));
+                    btn.textContent = `Enviando... ${pct}%`;
+                }
+
+                statusArea.innerHTML = '<span style="color: #10b981; font-size: 1.2rem;">🚀 Sucesso! Dados enviados.</span>';
+                btn.style.display = 'none';
+                pendingSyncData = [];
+            } catch (err) {
+                console.error('Erro no upload:', err);
+                statusArea.innerHTML = '<span style="color: #ef4444;">❌ Erro: ' + err.message + '</span>';
+                btn.textContent = 'Tentar Novamente';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>
