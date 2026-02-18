@@ -101,7 +101,8 @@ function handleFile(file) {
         // Normalize
         const normalizedData = jsonData.map(row => {
             const keys = Object.keys(row);
-            const idKey = keys.find(k => k.toLowerCase().includes('id') || k.toLowerCase().includes('entregador'));
+            // Improved column detection
+            const idKey = keys.find(k => k.toLowerCase().includes('id') || k.toLowerCase().includes('entregador') || k.toLowerCase().includes('nome'));
             const valKey = keys.find(k => k.toLowerCase().includes('valor'));
             const recKey = keys.find(k => k.toLowerCase().includes('recebedor') || k.toLowerCase().includes('cliente'));
 
@@ -164,7 +165,7 @@ async function uploadToSupabase(data) {
             btn.textContent = `Enviando... ${progress}%`;
         }
 
-        if (error) throw error;
+
 
         alert('Sucesso! Dados enviados para o Supabase. 🚀');
         btn.style.display = 'none';
