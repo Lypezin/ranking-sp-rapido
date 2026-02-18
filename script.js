@@ -101,14 +101,19 @@ function handleFile(file) {
         // Normalize
         const normalizedData = jsonData.map(row => {
             const keys = Object.keys(row);
-            // Improved column detection
-            const idKey = keys.find(k => k.toLowerCase().includes('id') || k.toLowerCase().includes('entregador') || k.toLowerCase().includes('nome'));
+            // Improved column detection: Prioritize NAME for display
+            const nameKey = keys.find(k => k.toLowerCase().includes('nome') || k.toLowerCase().includes('entregador'));
+            const idKey = keys.find(k => k.toLowerCase().includes('id'));
+
+            // Use Name if found, otherwise ID
+            const displayKey = nameKey || idKey;
+
             const valKey = keys.find(k => k.toLowerCase().includes('valor'));
             const recKey = keys.find(k => k.toLowerCase().includes('recebedor') || k.toLowerCase().includes('cliente'));
 
-            if (idKey && valKey) {
+            if (displayKey && valKey) {
                 return {
-                    courier_id: String(row[idKey]),
+                    courier_id: String(row[displayKey]), // This will now hold the Name if available
                     receiver: recKey ? String(row[recKey]) : '',
                     value: parseValue(row[valKey])
                 };
