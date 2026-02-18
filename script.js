@@ -1,5 +1,5 @@
 
-// Configuration Supabase - Credentials provided by User
+// Configuration Supabase
 const SUPABASE_URL = 'https://dcwwyzvlqwrpwpeyfzhv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjd3d5enZscXdycHdwZXlmemh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MzE1NTYsImV4cCI6MjA4NzAwNzU1Nn0.HLC46MtdgUM21yOzGXfkZzuuzyR3BqOKZ-GrzrxA88k';
 
@@ -12,7 +12,13 @@ let globalRankingData = [];
 let pendingSyncData = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Try to fetch from Supabase first (Online Source Control)
+    // Check for Admin Mode (?admin=true in URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('admin') === 'true') {
+        document.getElementById('dropZone').style.display = 'flex';
+    }
+
+    // 1. Fetch from Supabase
     fetchFromSupabase();
 
     // Setup Drag & Drop & Sync Button
@@ -20,7 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('fileInput');
     const btnSync = document.getElementById('btnSync');
 
-    // Click to upload
     dropZone.addEventListener('click', (e) => {
         if (e.target !== btnSync) fileInput.click();
     });
@@ -29,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.files.length > 0) handleFile(e.target.files[0]);
     });
 
-    // Drag & Drop
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.classList.add('dragover');
@@ -45,7 +49,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
     });
 
-    // Sync Button
     btnSync.addEventListener('click', () => {
         if (pendingSyncData.length > 0) {
             uploadToSupabase(pendingSyncData);
@@ -66,25 +69,41 @@ async function fetchFromSupabase() {
 
         if (data && data.length > 0) {
             console.log('Dados carregados do Supabase:', data.length);
-            // Map keys Supabase (snake_case) to app logic
-            const mappedData = data.map(item => ({
-                id_da_pessoa_entregadora: item.courier_id,
-                recebedor: item.receiver,
-                valor: item.value
-            }));
 
-            globalRankingData = processData(mappedData);
+            // KEY FIX: Use 'receiver' as the display name, group by 'receiver'
+            globalRankingData = processSupabaseData(data);
             renderRanking(globalRankingData);
-            document.querySelector('header p').textContent = 'Dados atualizados do Banco de Dados Online.';
         } else {
             console.log('Banco de dados vazio.');
-            document.getElementById('rankingList').innerHTML = '<div style="text-align:center; color: #94a3b8;">Banco de dados vazio. Arraste sua planilha para preencher!</div>';
+            document.getElementById('rankingList').innerHTML = '<div style="text-align:center; color: #94a3b8; padding: 2rem;">Banco de dados vazio.</div>';
         }
     } catch (err) {
         console.error('Erro ao conectar Supabase:', err);
-        // Fallback or alert?
-        // document.getElementById('rankingList').innerHTML = '<div style="text-align:center; color: red;">Erro ao conectar ao banco de dados.</div>';
     }
+}
+
+// Process Supabase data: group by RECEIVER (name), sum VALUE
+function processSupabaseData(data) {
+    const totals = {};
+
+    data.forEach(row => {
+        const name = row.receiver || row.courier_id || 'Desconhecido';
+        const value = parseFloat(row.value) || 0;
+
+        if (totals[name]) {
+            totals[name] += value;
+        } else {
+            totals[name] = value;
+        }
+    });
+
+    const rankingArray = Object.keys(totals).map(name => ({
+        id: name,
+        total: totals[name]
+    }));
+
+    rankingArray.sort((a, b) => b.total - a.total);
+    return rankingArray;
 }
 
 function handleFile(file) {
@@ -95,26 +114,27 @@ function handleFile(file) {
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
 
-        // Convert to JSON
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-        // Normalize
         const normalizedData = jsonData.map(row => {
             const keys = Object.keys(row);
-            // Improved column detection: Prioritize NAME for display
-            const nameKey = keys.find(k => k.toLowerCase().includes('nome') || k.toLowerCase().includes('entregador'));
+
+            // Look for Name/Receiver column for display
+            const nameKey = keys.find(k =>
+                k.toLowerCase().includes('recebedor') ||
+                k.toLowerCase().includes('nome') ||
+                k.toLowerCase().includes('cliente') ||
+                k.toLowerCase().includes('entregador')
+            );
             const idKey = keys.find(k => k.toLowerCase().includes('id'));
-
-            // Use Name if found, otherwise ID
-            const displayKey = nameKey || idKey;
-
             const valKey = keys.find(k => k.toLowerCase().includes('valor'));
-            const recKey = keys.find(k => k.toLowerCase().includes('recebedor') || k.toLowerCase().includes('cliente'));
+
+            const displayKey = nameKey || idKey;
 
             if (displayKey && valKey) {
                 return {
-                    courier_id: String(row[displayKey]), // This will now hold the Name if available
-                    receiver: recKey ? String(row[recKey]) : '',
+                    courier_id: idKey ? String(row[idKey]) : String(row[displayKey]),
+                    receiver: nameKey ? String(row[nameKey]) : String(row[displayKey]),
                     value: parseValue(row[valKey])
                 };
             }
@@ -122,22 +142,24 @@ function handleFile(file) {
         }).filter(item => item !== null);
 
         if (normalizedData.length > 0) {
-            // Preview locally
-            const previewData = normalizedData.map(item => ({
-                id_da_pessoa_entregadora: item.courier_id,
-                recebedor: item.receiver,
-                valor: item.value
-            }));
+            // Preview locally using receiver as display name
+            const previewTotals = {};
+            normalizedData.forEach(item => {
+                const name = item.receiver || item.courier_id;
+                previewTotals[name] = (previewTotals[name] || 0) + item.value;
+            });
 
-            globalRankingData = processData(previewData);
+            globalRankingData = Object.keys(previewTotals).map(name => ({
+                id: name,
+                total: previewTotals[name]
+            })).sort((a, b) => b.total - a.total);
+
             renderRanking(globalRankingData);
 
-            // Show Sync Button
             pendingSyncData = normalizedData;
             document.getElementById('btnSync').style.display = 'block';
-            document.querySelector('header p').textContent = `Pré-visualização de ${normalizedData.length} registros. Clique em "Enviar" para salvar online.`;
         } else {
-            alert('Não encontrei as colunas esperadas (ID, Valor).');
+            alert('Não encontrei as colunas esperadas (Nome/ID, Valor).');
         }
     };
     reader.readAsArrayBuffer(file);
@@ -149,13 +171,6 @@ async function uploadToSupabase(data) {
     btn.disabled = true;
 
     try {
-        // Clear current table? Or append? Assuming append or replace.
-        // For simplicity, let's just insert.
-        // Optional: Delete all before inserting to avoid duplicates if that's the goal.
-        // await supabase.from('delivery_rankings').delete().neq('id', 0); // "Delete all" is tricky with RLS/policies sometimes.
-
-        // Using batch insert (Supabase handles batching automatically mostly, but let's be safe with chunks if large)
-        // Batch insert in chunks of 500 to avoid payload limits
         const CHUNK_SIZE = 500;
         for (let i = 0; i < data.length; i += CHUNK_SIZE) {
             const chunk = data.slice(i, i + CHUNK_SIZE);
@@ -165,23 +180,17 @@ async function uploadToSupabase(data) {
 
             if (error) throw error;
 
-            // Optional: Update progress on button
             const progress = Math.min(100, Math.round(((i + chunk.length) / data.length) * 100));
             btn.textContent = `Enviando... ${progress}%`;
         }
 
-
-
         alert('Sucesso! Dados enviados para o Supabase. 🚀');
         btn.style.display = 'none';
-        document.querySelector('header p').textContent = 'Dados salvos com sucesso na nuvem!';
-
-        // Refresh from DB to be sure
         fetchFromSupabase();
 
     } catch (err) {
         console.error('Erro no upload:', err);
-        alert('Erro ao enviar dados. Verifique o console ou as permissões da tabela.');
+        alert('Erro ao enviar dados. Verifique o console.');
         btn.textContent = 'Tentar Novamente';
         btn.disabled = false;
     }
@@ -199,29 +208,6 @@ function parseValue(rawVal) {
         return parseFloat(rawVal);
     }
     return 0;
-}
-
-function processData(data) {
-    const totals = {};
-
-    data.forEach(entry => {
-        const id = entry.id_da_pessoa_entregadora;
-        const value = parseFloat(entry.valor);
-
-        if (totals[id]) {
-            totals[id] += value;
-        } else {
-            totals[id] = value;
-        }
-    });
-
-    const rankingArray = Object.keys(totals).map(id => ({
-        id: id,
-        total: totals[id]
-    }));
-
-    rankingArray.sort((a, b) => b.total - a.total);
-    return rankingArray;
 }
 
 function renderRanking(data) {
@@ -252,7 +238,7 @@ function renderRanking(data) {
             <div class="rank-info">
                 <div class="rank-position">${rank}º</div>
                 <div class="rank-details">
-                    <h3 style="font-size: 1.3rem;">${item.id}</h3>
+                    <h3>${item.id}</h3>
                 </div>
             </div>
             <div class="rank-value">${formattedValue}</div>
@@ -307,7 +293,7 @@ function renderFiltered(data) {
             <div class="rank-info">
                 <div class="rank-position">${item.realRank}º</div>
                 <div class="rank-details">
-                    <h3 style="font-size: 1.3rem;">${item.id}</h3>
+                    <h3>${item.id}</h3>
                 </div>
             </div>
             <div class="rank-value">${formattedValue}</div>

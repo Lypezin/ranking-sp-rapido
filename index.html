@@ -10,44 +10,35 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <div class="background-blobs">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-        <div class="blob blob-3"></div>
-    </div>
-
     <div class="container">
         <header>
             <h1>Ranking de Performance</h1>
-            <header>
-                <h1>Ranking de Performance</h1>
-            </header>
+        </header>
 
-            <!-- Drop Zone hidden for public view -->
-            <div id="dropZone" class="drop-zone" style="display: none;">
-                <p>Admin: Arraste <strong>ranking.xlsx</strong></p>
-                <input type="file" id="fileInput" accept=".xlsx, .xls" hidden>
-                <button id="btnSync" class="btn-sync" style="display: none;">Enviar para o Banco ☁️</button>
-            </div>
+        <!-- Drop Zone: hidden by default, shown with ?admin=true -->
+        <div id="dropZone" class="drop-zone" style="display: none;">
+            <p>Admin: Arraste <strong>ranking.xlsx</strong></p>
+            <input type="file" id="fileInput" accept=".xlsx, .xls" hidden>
+            <button id="btnSync" class="btn-sync" style="display: none;">Enviar para o Banco ☁️</button>
+        </div>
 
-            <div class="search-container">
-                <input type="number" id="searchInput" placeholder="Buscar por ID do Entregador..."
-                    oninput="filterRanking()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                    class="search-icon">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-            </div>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Buscar por nome..." oninput="filterRanking()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="search-icon">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+        </div>
 
-            <div id="rankingList" class="ranking-list">
-                <!-- Ranking items will be injected here by JS -->
-            </div>
+        <div id="rankingList" class="ranking-list">
+            <!-- Ranking items will be injected here by JS -->
+        </div>
     </div>
 
     <script src="data.js"></script>
