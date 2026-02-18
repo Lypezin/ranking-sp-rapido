@@ -15,19 +15,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function fetchFromSupabase() {
     try {
-        const { data, error } = await supabaseClient
-            .from('delivery_rankings')
-            .select('*')
-            .limit(10000);
+        // Fetch ALL rows using pagination (Supabase default limit is 1000)
+        let allData = [];
+        let from = 0;
+        const BATCH_SIZE = 1000;
+        let keepFetching = true;
 
-        if (error) throw error;
+        document.getElementById('rankingList').innerHTML =
+            '<div style="text-align:center; color: #94a3b8; padding: 2rem;">Carregando dados...</div>';
 
-        if (data && data.length > 0) {
-            console.log('Dados carregados do Supabase:', data.length);
-            console.log('Exemplo de dado:', data[0]); // Debug: verify column names
+        while (keepFetching) {
+            const { data, error } = await supabaseClient
+                .from('delivery_rankings')
+                .select('courier_id, receiver, value')
+                .range(from, from + BATCH_SIZE - 1);
 
-            // Group by courier_id (ID), sum values, display receiver name
-            globalRankingData = processSupabaseData(data);
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                allData = allData.concat(data);
+                from += BATCH_SIZE;
+
+                // If we got less than BATCH_SIZE, we've reached the end
+                if (data.length < BATCH_SIZE) {
+                    keepFetching = false;
+                }
+            } else {
+                keepFetching = false;
+            }
+        }
+
+        if (allData.length > 0) {
+            console.log('Total de registros carregados do Supabase:', allData.length);
+            console.log('Exemplo de dado:', allData[0]);
+
+            globalRankingData = processSupabaseData(allData);
             renderRanking(globalRankingData);
         } else {
             console.log('Banco de dados vazio.');
