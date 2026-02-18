@@ -24,6 +24,7 @@ async function fetchFromSupabase() {
 
         if (data && data.length > 0) {
             console.log('Dados carregados do Supabase:', data.length);
+            console.log('Exemplo de dado:', data[0]); // Debug: verify column names
 
             // Group by courier_id (ID), sum values, display receiver name
             globalRankingData = processSupabaseData(data);
@@ -65,7 +66,9 @@ function processSupabaseData(data) {
     }));
 
     rankingArray.sort((a, b) => b.total - a.total);
-    return rankingArray;
+
+    // Limit to top 60
+    return rankingArray.slice(0, 60);
 }
 
 function renderRanking(data) {

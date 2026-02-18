@@ -131,15 +131,24 @@
                 const normalizedData = jsonData.map(row => {
                     const keys = Object.keys(row);
 
-                    // Find columns
+                    // STEP 1: Find the ID column first
                     const idKey = keys.find(k => k.toLowerCase().includes('id'));
-                    const nameKey = keys.find(k =>
-                        k.toLowerCase().includes('recebedor') ||
-                        k.toLowerCase().includes('nome') ||
-                        k.toLowerCase().includes('cliente') ||
-                        k.toLowerCase().includes('entregador')
-                    );
+
+                    // STEP 2: Find the NAME column, EXCLUDING the ID column
+                    // This prevents 'id_da_pessoa_entregadora' from matching as both ID and Name
+                    const nameKey = keys.find(k => {
+                        if (k === idKey) return false; // Skip the ID column!
+                        const lower = k.toLowerCase();
+                        return lower.includes('recebedor') ||
+                            lower.includes('nome') ||
+                            lower.includes('cliente') ||
+                            lower.includes('entregador');
+                    });
+
                     const valKey = keys.find(k => k.toLowerCase().includes('valor'));
+
+                    console.log('Colunas detectadas:', { idKey, nameKey, valKey });
+                    console.log('Exemplo de linha:', { id: row[idKey], name: row[nameKey], val: row[valKey] });
 
                     if ((idKey || nameKey) && valKey) {
                         return {
