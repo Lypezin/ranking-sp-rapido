@@ -59,7 +59,8 @@ async function fetchFromSupabase() {
     try {
         const { data, error } = await supabaseClient
             .from('delivery_rankings')
-            .select('*');
+            .select('*')
+            .limit(10000);
 
         if (error) throw error;
 
@@ -148,9 +149,20 @@ async function uploadToSupabase(data) {
         // await supabase.from('delivery_rankings').delete().neq('id', 0); // "Delete all" is tricky with RLS/policies sometimes.
 
         // Using batch insert (Supabase handles batching automatically mostly, but let's be safe with chunks if large)
-        const { error } = await supabaseClient
-            .from('delivery_rankings')
-            .insert(data);
+        // Batch insert in chunks of 500 to avoid payload limits
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+            const chunk = data.slice(i, i + CHUNK_SIZE);
+            const { error } = await supabaseClient
+                .from('delivery_rankings')
+                .insert(chunk);
+
+            if (error) throw error;
+
+            // Optional: Update progress on button
+            const progress = Math.min(100, Math.round(((i + chunk.length) / data.length) * 100));
+            btn.textContent = `Enviando... ${progress}%`;
+        }
 
         if (error) throw error;
 
@@ -234,8 +246,7 @@ function renderRanking(data) {
             <div class="rank-info">
                 <div class="rank-position">${rank}º</div>
                 <div class="rank-details">
-                    <h3>ID: ${item.id}</h3>
-                    <p>Entregador</p>
+                    <h3 style="font-size: 1.3rem;">${item.id}</h3>
                 </div>
             </div>
             <div class="rank-value">${formattedValue}</div>
@@ -290,8 +301,7 @@ function renderFiltered(data) {
             <div class="rank-info">
                 <div class="rank-position">${item.realRank}º</div>
                 <div class="rank-details">
-                    <h3>ID: ${item.id}</h3>
-                    <p>Entregador</p>
+                    <h3 style="font-size: 1.3rem;">${item.id}</h3>
                 </div>
             </div>
             <div class="rank-value">${formattedValue}</div>
