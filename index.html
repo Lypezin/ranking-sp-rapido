@@ -23,29 +23,31 @@
     <div class="container">
         <header>
             <h1>Ranking de Performance</h1>
-            <p>Consulte sua posição e valor total acumulado.</p>
-        </header>
+            <header>
+                <h1>Ranking de Performance</h1>
+            </header>
 
-        <div id="dropZone" class="drop-zone">
-            <p>Arraste o arquivo <strong>ranking.xlsx</strong> aqui para importar</p>
-            <input type="file" id="fileInput" accept=".xlsx, .xls" hidden>
-            <button id="btnSync" class="btn-sync" style="display: none;">Enviar para o Banco de Dados ☁️</button>
-        </div>
+            <!-- Drop Zone hidden for public view -->
+            <div id="dropZone" class="drop-zone" style="display: none;">
+                <p>Admin: Arraste <strong>ranking.xlsx</strong></p>
+                <input type="file" id="fileInput" accept=".xlsx, .xls" hidden>
+                <button id="btnSync" class="btn-sync" style="display: none;">Enviar para o Banco ☁️</button>
+            </div>
 
-        <div class="search-container">
-            <input type="number" id="searchInput" placeholder="Buscar por ID do Entregador..."
-                oninput="filterRanking()">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                class="search-icon">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-        </div>
+            <div class="search-container">
+                <input type="number" id="searchInput" placeholder="Buscar por ID do Entregador..."
+                    oninput="filterRanking()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="search-icon">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </div>
 
-        <div id="rankingList" class="ranking-list">
-            <!-- Ranking items will be injected here by JS -->
-        </div>
+            <div id="rankingList" class="ranking-list">
+                <!-- Ranking items will be injected here by JS -->
+            </div>
     </div>
 
     <script src="data.js"></script>
